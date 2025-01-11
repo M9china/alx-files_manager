@@ -6,7 +6,7 @@ settings:
 
 dependencies:
   body-parser:
-    specifier: ^1.20.2
+    specifier: ^1.20.3
     version: 1.20.3
   bull:
     specifier: ^3.16.0
