@@ -201,32 +201,24 @@ class FilesController {
   }
   static async getFile(req, res) {
     const { id } = req.params;
-    const token = req.headers['x-token'];
-    const userid = await redis.get(`auth_${token}`);
-    const user = await (await db.usersCollection()).findOne({ _id: ObjectId(userid) });
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const findFile = await (await db.filesCollection())
-      .findOne({ _id: ObjectId(id)});
-    if (!findFile) {
-      return res.status(404).json({ error: 'Not found' });
-    }
-    if (findFile.isPublic === 'false' && findFile.userId !== ObjectId(userid)){
-      return res.status(404).json({ error: 'Not found' });
-    }
-    let localPath;
-    if ('localPath' in findFile){
-      localPath = findFile.localPath;
-    }else{
-      return res.status(404).json({ error: 'Not found' });
-    }
-    const mimeType = mime.contentType(findFile.name);
+    const { size } = req.query;
 
-    res.setHeader('Content-Type', mimeType);
-    const data = await fsPromises.readFile(localPath);
-    return res.status(200).send(data);
+    const validSizes = ['500', '250', '100'];
+    const file = await dbClient.collection('files').findOne({ _id: id });
+
+    if (!file) return res.status(404).send({ error: 'Not found' });
+
+    let filePath = `/tmp/files_manager/${id}`;
+    if (size && validSizes.includes(size)) filePath += `_${size}`;
+
+    try {
+      await fs.access(filePath);
+      return res.sendFile(filePath);
+    } catch (err) {
+      return res.status(404).send({ error: 'Not found' });
+    }
   }
+
 }
 
 module.exports = FilesController;
