@@ -21,8 +21,8 @@ class FilesController {
 
     const name = req.body ? req.body.name : null;
     const type = req.body ? req.body.type : null;
-    const parentId = req.body && req.body.parentId ? req.body.parentId : 0;
-    const isPublic = req.body && req.body.isPublic ? req.body.isPublic : false;
+    const parentId = req.body ?? req.body.parentId ? req.body.parentId : 0;
+    const isPublic = req.body ?? req.body.isPublic ? req.body.isPublic : false;
     const data = req.body ? req.body.data : null;
 
     if (!name) {
@@ -42,9 +42,35 @@ class FilesController {
       const findByparent = await (await db.filesCollection()).findOne({ _id: ObjectId(parentId) });
       if (!findByparent) {
         return res.status(400).json({ error: 'Parent not found' });
-      } if (findByparent.type !== 'folder') {
+      }
+      if (findByparent.type !== 'folder') {
         return res.status(400).json({ error: 'Parent is not a folder' });
       }
+    }
+    if (type === 'image') {
+      const uuidName = uuidv4();
+      const dir = path.dirname(`${folderPath}/${uuidName}`);
+
+      const dataBase64 = Buffer.from(data, 'base64').toString('utf-8');
+      fs.mkdir(dir, { recursive: true }, (err) => {
+          if (!err) {
+              fs.writeFile(`${folderPath}/${uuidName}`, dataBase64, () => {});
+          }
+      });
+
+      const newFile = await (await db.filesCollection()).insertOne({
+          userId: user._id, name, type, parentId, isPublic, localPath: `${folderPath}/${uuidName}`,
+      });
+
+      fileQueue.add({
+          userId: user._id,
+          fileId: newFile.insertedId,
+          localPath: `${folderPath}/${uuidName}`
+      });
+
+      return res.status(201).json({
+          id: newFile.insertedId, userId: user._id, name, type, isPublic, parentId,
+      });
     }
     if (type === 'folder') {
       const newFilefolder = await (await db.filesCollection()).insertOne({
